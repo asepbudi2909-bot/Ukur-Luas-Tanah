@@ -5,6 +5,7 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    base: '/Ukur-Luas-Tanah/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
