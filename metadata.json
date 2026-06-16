@@ -1,0 +1,6 @@
+{
+  "name": "Ukur Luas Tanah",
+  "description": "Aplikasi pengukur luas tanah interaktif menggunakan rumus Heron berbasis gambar poligon pada canvas dengan kalkulasi instan.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
