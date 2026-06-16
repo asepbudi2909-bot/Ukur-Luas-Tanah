@@ -116,8 +116,8 @@ export const LocalUnitsConverter: React.FC<LocalUnitsConverterProps> = ({
                 <div className="text-xl font-black font-mono tracking-tight text-white">
                   {isClosed ? (
                     info.value.toLocaleString('id-ID', {
-                      minimumFractionDigits: 4,
-                      maximumFractionDigits: 6,
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
                     })
                   ) : (
                     <span className="text-slate-600 opacity-40">-</span>
@@ -168,7 +168,7 @@ export const LocalUnitsConverter: React.FC<LocalUnitsConverterProps> = ({
           <div className="text-right">
             <div className="text-lg font-black font-mono text-emerald-400 tracking-tight">
               {isClosed ? (
-                `Rp ${totalValuation.toLocaleString('id-ID', { maximumFractionDigits: 0 })}`
+                `Rp ${totalValuation.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
               ) : (
                 <span className="text-slate-600 font-semibold">-</span>
               )}
