@@ -72,11 +72,11 @@ export default function App() {
         p1,
         p2,
         p3,
-        a: parseFloat(sideA.toFixed(4)),
-        b: parseFloat(sideB.toFixed(4)),
-        c: parseFloat(sideC.toFixed(4)),
-        s: parseFloat(s.toFixed(4)),
-        area: parseFloat(area.toFixed(4)),
+        a: parseFloat(sideA.toFixed(2)),
+        b: parseFloat(sideB.toFixed(2)),
+        c: parseFloat(sideC.toFixed(2)),
+        s: parseFloat(s.toFixed(2)),
+        area: parseFloat(area.toFixed(2)),
         index: idx + 1,
         label: `Segitiga ${idx + 1}`,
       };
@@ -126,7 +126,7 @@ export default function App() {
       segments.push({
         num: i + 1,
         label: `${pCurrent.label || `P${i+1}`} ke ${pNext.label || `P${(i+1)%points.length+1}`}`,
-        distance: parseFloat(d.toFixed(4)),
+        distance: parseFloat(d.toFixed(2)),
       });
     }
     return segments;
@@ -183,7 +183,7 @@ export default function App() {
             <div className="font-bold text-slate-800 border-b border-slate-200 pb-1 uppercase text-[9px] tracking-wider mb-1">Parameter Metrik & Sistem</div>
             <div><span className="font-semibold text-slate-500">Sistem Koordinat:</span> <span className="font-medium text-slate-900">Grid Lokal CAD Terkalibrasi</span></div>
             <div><span className="font-semibold text-slate-500">Tanggal Pengukuran:</span> <span className="font-medium text-slate-900">{new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span></div>
-            <div><span className="font-semibold text-slate-500">Rasio Skala Cetak:</span> <span className="font-mono text-slate-900 text-[11px]">1 meter = {scalePixelRatio.toFixed(4)} pixel</span></div>
+            <div><span className="font-semibold text-slate-500">Rasio Skala Cetak:</span> <span className="font-mono text-slate-900 text-[11px]">1 meter = {scalePixelRatio.toFixed(2)} pixel</span></div>
           </div>
         </div>
 
@@ -307,7 +307,7 @@ export default function App() {
                         fill="#000000"
                         fontFamily="monospace"
                       >
-                        {seg.distance.toFixed(4)}m
+                        {seg.distance.toFixed(2)}m
                       </text>
                     </g>
                   );
@@ -360,10 +360,10 @@ export default function App() {
         <div className="mb-6 bg-slate-900 text-white p-4 rounded-xl grid grid-cols-2 shadow-sm font-sans">
           <div className="border-r border-slate-755 pr-4">
             <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block mb-1">TOTAL LUAS BIDANG (RUMUS HERON)</span>
-            <span className="text-2xl font-black text-white font-mono">{totalArea.toLocaleString('id-ID', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} m²</span>
+            <span className="text-2xl font-black text-white font-mono">{totalArea.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m²</span>
             {shoelaceArea > 0 && (
               <div className="text-[9px] text-slate-400 mt-1 font-mono">
-                Selisih dari Amplop Geometris (Shoelace): {Math.abs(totalArea - shoelaceArea).toFixed(4)} m² ({(Math.abs(totalArea - shoelaceArea) / (shoelaceArea || 1) * 100).toFixed(5)}%)
+                Selisih dari Amplop Geometris (Shoelace): {Math.abs(totalArea - shoelaceArea).toFixed(2)} m² ({(Math.abs(totalArea - shoelaceArea) / (shoelaceArea || 1) * 100).toFixed(2)}%)
               </div>
             )}
           </div>
@@ -395,7 +395,7 @@ export default function App() {
                   <tr key={`print-seg-row-${idx}`} className="border-b border-slate-200">
                     <td className="py-1.5 px-2 text-center font-mono text-slate-500">{seg.num}</td>
                     <td className="py-1.5 px-2 font-semibold">Segmen {seg.label}</td>
-                    <td className="py-1.5 px-2 text-right font-bold font-mono">{seg.distance.toFixed(4)} m</td>
+                    <td className="py-1.5 px-2 text-right font-bold font-mono">{seg.distance.toFixed(2)} m</td>
                   </tr>
                 ))}
               </tbody>
@@ -419,32 +419,32 @@ export default function App() {
               <tbody>
                 <tr className="border-b border-slate-200">
                   <td className="py-1.5 px-2 font-semibold">Hektar (ha)</td>
-                  <td className="py-1.5 px-2 text-right font-bold font-mono">{(totalArea / 10000).toLocaleString('id-ID', { minimumFractionDigits: 4, maximumFractionDigits: 6 })} ha</td>
+                  <td className="py-1.5 px-2 text-right font-bold font-mono">{(totalArea / 10000).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ha</td>
                   <td className="py-1.5 px-2 text-slate-500 text-[10px]">Nasional</td>
                 </tr>
                 <tr className="border-b border-slate-200">
                   <td className="py-1.5 px-2 font-semibold">Are (are)</td>
-                  <td className="py-1.5 px-2 text-right font-bold font-mono">{(totalArea / 100).toLocaleString('id-ID', { minimumFractionDigits: 4, maximumFractionDigits: 5 })} are</td>
+                  <td className="py-1.5 px-2 text-right font-bold font-mono">{(totalArea / 100).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} are</td>
                   <td className="py-1.5 px-2 text-slate-500 text-[10px]">Nasional / Bali</td>
                 </tr>
                 <tr className="border-b border-slate-200">
                   <td className="py-1.5 px-2 font-semibold">Ru / Tumbak / Bata</td>
-                  <td className="py-1.5 px-2 text-right font-bold font-mono">{(totalArea / 14.0625).toLocaleString('id-ID', { minimumFractionDigits: 4, maximumFractionDigits: 5 })} bata</td>
+                  <td className="py-1.5 px-2 text-right font-bold font-mono">{(totalArea / 14.0625).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} bata</td>
                   <td className="py-1.5 px-2 text-slate-500 text-[10px]">Jawa Barat / Sunda</td>
                 </tr>
                 <tr className="border-b border-slate-200">
                   <td className="py-1.5 px-2 font-semibold">Ubin</td>
-                  <td className="py-1.5 px-2 text-right font-bold font-mono">{(totalArea / 14.0625).toLocaleString('id-ID', { minimumFractionDigits: 4, maximumFractionDigits: 5 })} ubin</td>
+                  <td className="py-1.5 px-2 text-right font-bold font-mono">{(totalArea / 14.0625).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ubin</td>
                   <td className="py-1.5 px-2 text-slate-500 text-[10px]">Jawa Tengah / Jawa Timur</td>
                 </tr>
                 <tr className="border-b border-slate-200">
                   <td className="py-1.5 px-2 font-semibold">Rantai</td>
-                  <td className="py-1.5 px-2 text-right font-bold font-mono">{(totalArea / 400).toLocaleString('id-ID', { minimumFractionDigits: 4, maximumFractionDigits: 5 })} rantai</td>
+                  <td className="py-1.5 px-2 text-right font-bold font-mono">{(totalArea / 400).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} rantai</td>
                   <td className="py-1.5 px-2 text-slate-500 text-[10px]">Sumatera / Kalimantan</td>
                 </tr>
                 <tr className="border-b border-slate-200">
                   <td className="py-1.5 px-2 font-semibold">Bahu</td>
-                  <td className="py-1.5 px-2 text-right font-bold font-mono">{(totalArea / 7096.5).toLocaleString('id-ID', { minimumFractionDigits: 4, maximumFractionDigits: 6 })} bahu</td>
+                  <td className="py-1.5 px-2 text-right font-bold font-mono">{(totalArea / 7096.5).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} bahu</td>
                   <td className="py-1.5 px-2 text-slate-500 text-[10px]">Penjuru Sawah Jawa</td>
                 </tr>
               </tbody>
@@ -471,9 +471,9 @@ export default function App() {
             </thead>
             <tbody>
               {triangles.map((tri, idx) => {
-                const subSa = parseFloat((tri.s - tri.a).toFixed(4));
-                const subSb = parseFloat((tri.s - tri.b).toFixed(4));
-                const subSc = parseFloat((tri.s - tri.c).toFixed(4));
+                const subSa = parseFloat((tri.s - tri.a).toFixed(2));
+                const subSb = parseFloat((tri.s - tri.b).toFixed(2));
+                const subSc = parseFloat((tri.s - tri.c).toFixed(2));
                 return (
                   <tr key={`print-tri-row-${idx}`} className="border-b border-slate-200 font-mono">
                     <td className="py-2 px-2 text-center font-bold text-slate-900">T{idx + 1}</td>
@@ -489,7 +489,7 @@ export default function App() {
                     <td className="py-2 px-2 text-[10px] text-slate-600 leading-snug">
                       √[{tri.s} × {subSa} × {subSb} × {subSc}]
                     </td>
-                    <td className="py-2 px-2 text-right font-bold text-slate-900">{tri.area.toFixed(4)} m²</td>
+                    <td className="py-2 px-2 text-right font-bold text-slate-900">{tri.area.toFixed(2)} m²</td>
                   </tr>
                 );
               })}

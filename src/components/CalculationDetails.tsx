@@ -150,7 +150,7 @@ export const CalculationDetails: React.FC<CalculationDetailsProps> = ({
             {shoelaceArea > 0 && (
               <div className="mt-5 w-full bg-slate-900/60 p-3 rounded-lg border border-slate-800 flex justify-between items-center text-xs font-mono">
                 <span className="text-slate-400">Luas Poligon Asli:</span>
-                <span className="font-bold text-white">{shoelaceArea.toLocaleString('id-ID', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} m²</span>
+                <span className="font-bold text-white">{shoelaceArea.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m²</span>
               </div>
             )}
           </div>
@@ -171,10 +171,10 @@ export const CalculationDetails: React.FC<CalculationDetailsProps> = ({
                 const isHovered = activeTriangleId === tri.id;
 
                 // Steps calculation strings
-                const sa = parseFloat((tri.s - tri.a).toFixed(4));
-                const sb = parseFloat((tri.s - tri.b).toFixed(4));
-                const sc = parseFloat((tri.s - tri.c).toFixed(4));
-                const product = parseFloat((tri.s * sa * sb * sc).toFixed(4));
+                const sa = parseFloat((tri.s - tri.a).toFixed(2));
+                const sb = parseFloat((tri.s - tri.b).toFixed(2));
+                const sc = parseFloat((tri.s - tri.c).toFixed(2));
+                const product = parseFloat((tri.s * sa * sb * sc).toFixed(2));
 
                 return (
                   <div
@@ -210,7 +210,7 @@ export const CalculationDetails: React.FC<CalculationDetailsProps> = ({
 
                       <div className="flex items-center gap-3">
                         <span className="text-xs font-bold text-emerald-400 font-mono">
-                          +{tri.area.toLocaleString('id-ID', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} m²
+                          +{tri.area.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m²
                         </span>
                         {onDeleteTriangle && (
                           <button
@@ -268,7 +268,7 @@ export const CalculationDetails: React.FC<CalculationDetailsProps> = ({
                             L = √[{product.toLocaleString('id-ID')}]
                           </div>
                           <div className="text-teal-400 font-bold text-[13px]">
-                            L = {tri.area.toLocaleString('id-ID', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} m²
+                            L = {tri.area.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m²
                           </div>
                         </div>
                       </div>
@@ -287,7 +287,7 @@ export const CalculationDetails: React.FC<CalculationDetailsProps> = ({
                 </div>
                 <div className="text-right">
                   <div className="text-[20px] font-extrabold font-mono tracking-tight text-white">
-                    {totalHeronArea.toLocaleString('id-ID', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} <span className="text-xs font-normal">m²</span>
+                    {totalHeronArea.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-xs font-normal">m²</span>
                   </div>
                   <div className="text-[9px] text-emerald-200 font-medium">BPN Sensus Standard</div>
                 </div>
@@ -297,7 +297,7 @@ export const CalculationDetails: React.FC<CalculationDetailsProps> = ({
                 <div className="border-t border-emerald-500/40 pt-2 flex justify-between items-center text-[10px] font-mono opacity-90">
                   <span className="text-emerald-100 uppercase">Luas Amplop Asli (Shoelace):</span>
                   <span className="font-bold text-white">
-                    {shoelaceArea.toLocaleString('id-ID', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} m²
+                    {shoelaceArea.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m²
                   </span>
                 </div>
               )}

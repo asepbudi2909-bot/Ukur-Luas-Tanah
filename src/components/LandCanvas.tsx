@@ -521,7 +521,7 @@ export const LandCanvas: React.FC<LandCanvasProps> = ({
               fill="#ffffff"
               className="text-[9px] font-semibold font-mono"
             >
-              {realDist.toFixed(4)}m
+              {realDist.toFixed(2)}m
             </text>
           </g>
         </g>
@@ -681,7 +681,7 @@ export const LandCanvas: React.FC<LandCanvasProps> = ({
           </div>
           <div>Koordinat: {points.length} Titik Terpasang</div>
           <div>Status Poligon: {isClosed ? '🔴 Tertutup (Heron Aktif)' : '🔵 Sedang Digambar'}</div>
-          <div>Rasio Skala: 1m = {scalePixelRatio.toFixed(4)}px</div>
+          <div>Rasio Skala: 1m = {scalePixelRatio.toFixed(2)}px</div>
           <div>Zoom Canvas: {Math.round(zoom * 100)}%</div>
         </div>
 
@@ -1013,14 +1013,14 @@ export const LandCanvas: React.FC<LandCanvasProps> = ({
               </h4>
             </div>
             <p className="text-[10px] text-slate-500 font-mono">
-              Origin (0,0) = Pojok Kiri Atas Canvas • Skala: 1m = {scalePixelRatio.toFixed(4)}px
+              Origin (0,0) = Pojok Kiri Atas Canvas • Skala: 1m = {scalePixelRatio.toFixed(2)}px
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2.5 max-h-[160px] overflow-y-auto pr-1 custom-scrollbar">
             {points.map((pt, idx) => {
-              const xVal = parseFloat((pt.x / scalePixelRatio).toFixed(4));
-              const yVal = parseFloat((pt.y / scalePixelRatio).toFixed(4));
+              const xVal = parseFloat((pt.x / scalePixelRatio).toFixed(2));
+              const yVal = parseFloat((pt.y / scalePixelRatio).toFixed(2));
 
               return (
                 <div 
