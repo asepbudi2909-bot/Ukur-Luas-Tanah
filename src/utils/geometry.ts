@@ -1,9 +1,27 @@
 import { Point, Triangle } from '../types';
 
 /**
+ * Minimum distance threshold for considering two points as overlapping
+ */
+const MIN_DISTANCE_THRESHOLD = 1e-3;
+
+/**
+ * Epsilon value for floating point comparisons in triangle calculations
+ */
+const FLOATING_POINT_EPSILON = 1e-10;
+
+/**
+ * Represents a point-like object with x and y coordinates
+ */
+interface Coordinate {
+  x: number;
+  y: number;
+}
+
+/**
  * Calculates the Euclidean distance between two points in pixels
  */
-export function getDistance(p1: { x: number; y: number }, p2: { x: number; y: number }): number {
+export function getDistance(p1: Coordinate, p2: Coordinate): number {
   return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
 }
 
@@ -11,8 +29,8 @@ export function getDistance(p1: { x: number; y: number }, p2: { x: number; y: nu
  * Calculates the distance in meters based on the scale pixel-to-meter ratio
  */
 export function getRealDistance(
-  p1: { x: number; y: number },
-  p2: { x: number; y: number },
+  p1: Coordinate,
+  p2: Coordinate,
   scalePixelRatio: number
 ): number {
   const pixelDist = getDistance(p1, p2);
@@ -23,21 +41,17 @@ export function getRealDistance(
  * Checks if segment AB intersects with segment CD
  */
 export function doSegmentsIntersect(
-  a: { x: number; y: number },
-  b: { x: number; y: number },
-  c: { x: number; y: number },
-  d: { x: number; y: number }
+  a: Coordinate,
+  b: Coordinate,
+  c: Coordinate,
+  d: Coordinate
 ): boolean {
-  // Helper to determine orientation
-  const ccw = (
-    p1: { x: number; y: number },
-    p2: { x: number; y: number },
-    p3: { x: number; y: number }
-  ) => {
+  // Helper to determine orientation (counter-clockwise check)
+  const ccw = (p1: Coordinate, p2: Coordinate, p3: Coordinate): boolean => {
     return (p3.y - p1.y) * (p2.x - p1.x) > (p2.y - p1.y) * (p3.x - p1.x);
   };
 
-  // Check if they share endpoints, sharing endpoints is not considered cross-intersecting here
+  // Check if they share endpoints - sharing endpoints is not considered cross-intersecting
   if (
     (a.x === c.x && a.y === c.y) ||
     (a.x === d.x && a.y === d.y) ||
@@ -62,7 +76,7 @@ export function isPolygonSelfIntersecting(points: Point[]): boolean {
     const b = points[(i + 1) % n];
 
     for (let j = i + 2; j < n; j++) {
-      // Do not check adjacent edges (they share a vertex)
+      // Skip adjacent edges (they share a vertex)
       if (j === (i - 1 + n) % n) continue;
 
       const c = points[j];
@@ -77,31 +91,34 @@ export function isPolygonSelfIntersecting(points: Point[]): boolean {
 }
 
 /**
- * Calculates the polygon orientation (signed shoelace area)
+ * Calculates the polygon orientation using the signed shoelace formula.
  * Positive = clockwise on standard Y-down canvas, Negative = counter-clockwise
  */
 export function getShoelaceArea(points: Point[]): number {
   let area = 0;
   const n = points.length;
+  
   for (let i = 0; i < n; i++) {
     const p1 = points[i];
     const p2 = points[(i + 1) % n];
     area += (p1.x * p2.y) - (p2.x * p1.y);
   }
+  
   return area / 2;
 }
 
 /**
- * Checks if point P is inside triangle ABC
+ * Checks if point P is inside triangle ABC using barycentric coordinates
  */
 export function isPointInTriangle(
-  p: { x: number; y: number },
-  a: { x: number; y: number },
-  b: { x: number; y: number },
-  c: { x: number; y: number }
+  p: Coordinate,
+  a: Coordinate,
+  b: Coordinate,
+  c: Coordinate
 ): boolean {
   const det = (b.y - c.y) * (a.x - c.x) + (c.x - b.x) * (a.y - c.y);
-  if (Math.abs(det) < 1e-10) return false;
+  
+  if (Math.abs(det) < FLOATING_POINT_EPSILON) return false;
 
   const factor1 = ((b.y - c.y) * (p.x - c.x) + (c.x - b.x) * (p.y - c.y)) / det;
   const factor2 = ((c.y - a.y) * (p.x - c.x) + (a.x - c.x) * (p.y - c.y)) / det;
@@ -113,32 +130,33 @@ export function isPointInTriangle(
 }
 
 /**
- * Ear Clipping Triangulation Algorithm
- * Divides progress of drawing polygon into individual component triangles,
- * then uses Heron's formula on each to calculate their area.
- * Returns an array of Triangles.
+ * Ear Clipping Triangulation Algorithm.
+ * 
+ * Divides a polygon into individual component triangles, then uses Heron's formula
+ * on each to calculate their area. Returns an array of Triangles.
+ * 
+ * @param points - Array of polygon vertices in order
+ * @param scalePixelRatio - Pixels per meter ratio for real-world distance calculation
+ * @returns Array of Triangle objects with calculated areas and side lengths
  */
 export function triangulatePolygon(points: Point[], scalePixelRatio: number): Triangle[] {
   if (points.length < 3) return [];
 
-  // Work on a duplicate copy
+  // Work on a duplicate copy to avoid mutating the original
   const polyList = [...points];
   let n = polyList.length;
 
   const triangles: Triangle[] = [];
   let triangleIndex = 0;
 
-  // We want to ensure counter-clockwise (CCW) vertex listing on a Y-down grid.
-  // Standard Y-down coordinate system means area sign matches clockwise. Let's force CCW orientation.
+  // Ensure counter-clockwise (CCW) vertex ordering on a Y-down grid.
+  // On canvas coordinate system: Y goes down. If shoelace < 0, it's CCW. If shoelace > 0, it's CW.
   const shoelace = getShoelaceArea(polyList);
-  // On canvas coordinate system: Y goes down
-  // If shoelace < 0, it's CCW. If shoelace > 0, it's CW.
-  // We want coordinates to be consistently oriented. Let's make it CCW.
   if (shoelace > 0) {
     polyList.reverse();
   }
 
-  // To prevent infinite loops in degenerate or complex shapes, limit iterations
+  // Prevent infinite loops in degenerate or complex shapes by limiting iterations
   let limit = n * n * 2;
   let i = 0;
 
@@ -154,24 +172,22 @@ export function triangulatePolygon(points: Point[], scalePixelRatio: number): Tr
     const pNext = polyList[nextIdx];
 
     // Check if the current vertex forms a convex vertex (internal angle < 180 degrees)
-    // Cross product (pNext - pCurr) x (pPrev - pCurr)
-    // On Y-down canvas, CCW orientation check:
+    // Cross product: (pNext - pCurr) x (pPrev - pCurr)
+    // On Y-down canvas with CCW orientation, convex corners have negative cross product
     const crossProduct = (pCurr.x - pPrev.x) * (pNext.y - pCurr.y) - (pCurr.y - pPrev.y) * (pNext.x - pCurr.x);
     
-    // In our orientation, convex corners will have a negative cross product (or vice versa depending on orientation).
-    // Let's check: turns left (which is convex for counter-clockwise traversal)
     if (crossProduct < 0) {
-      // It is a reflex angle, not convex. Try the next vertex.
+      // Reflex angle, not convex. Try the next vertex.
       i++;
       continue;
     }
 
-    // Check if any other vertex of the polygon lies inside the candidate triangle (pPrev, pCurr, pNext)
+    // Check if any other vertex lies inside the candidate triangle (pPrev, pCurr, pNext)
     let isEar = true;
     for (let j = 0; j < n; j++) {
       if (j === prevIdx || j === currIdx || j === nextIdx) continue;
+      
       const testPt = polyList[j];
-
       if (isPointInTriangle(testPt, pPrev, pCurr, pNext)) {
         isEar = false;
         break;
@@ -179,8 +195,7 @@ export function triangulatePolygon(points: Point[], scalePixelRatio: number): Tr
     }
 
     if (isEar) {
-      // Clip the ear!
-      // Calculate side lengths in meters
+      // Clip the ear and calculate triangle properties
       const sideA = getRealDistance(pPrev, pCurr, scalePixelRatio);
       const sideB = getRealDistance(pCurr, pNext, scalePixelRatio);
       const sideC = getRealDistance(pNext, pPrev, scalePixelRatio);
@@ -188,9 +203,8 @@ export function triangulatePolygon(points: Point[], scalePixelRatio: number): Tr
       // Semi-perimeter
       const s = (sideA + sideB + sideC) / 2;
 
-      // Heron's Area
+      // Heron's Area formula - use Math.max to prevent floating point errors
       const heronRadicand = s * (s - sideA) * (s - sideB) * (s - sideC);
-      // Math.max to prevent extremely tiny negative numbers due to floating point inaccuracies
       const area = Math.sqrt(Math.max(0, heronRadicand));
 
       triangles.push({
@@ -213,15 +227,13 @@ export function triangulatePolygon(points: Point[], scalePixelRatio: number): Tr
       polyList.splice(currIdx, 1);
       n = polyList.length;
 
-      // Start search again from previous vertex to optimize
+      // Restart search from previous vertex to optimize
       i = prevIdx;
     } else {
       i++;
     }
   }
 
-  // If the algorithm succeeded, we should have n === 2 (fully decomposed into triangles)
-  // If we couldn't decompose it (limit reached, degenerate or complex intersecting shapes),
-  // return what we found, but we can report that it was partially triangulated.
+  // Return successfully triangulated triangles (may be partial for complex shapes)
   return triangles;
 }
