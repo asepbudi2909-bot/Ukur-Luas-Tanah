@@ -22,6 +22,7 @@ import {
 export default function App() {
   const [points, setPoints] = useState<Point[]>([]);
   const [isClosed, setIsClosed] = useState<boolean>(false);
+  const [lockedSides, setLockedSides] = useState<Record<string, number>>({});
   const [scalePixelRatio, setScalePixelRatio] = useState<number>(20); // Default scale: 20 pixels = 1 meter
   const [snapToGrid, setSnapToGrid] = useState<boolean>(false);
   const gridSize = 40; // grid size in pixels
@@ -428,9 +429,9 @@ export default function App() {
                   <td className="py-1.5 px-2 text-slate-500 text-[10px]">Nasional / Bali</td>
                 </tr>
                 <tr className="border-b border-slate-200">
-                  <td className="py-1.5 px-2 font-semibold">Ru / Tumbak / Bata</td>
-                  <td className="py-1.5 px-2 text-right font-bold font-mono">{(totalArea / 14.0625).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} bata</td>
-                  <td className="py-1.5 px-2 text-slate-500 text-[10px]">Jawa Barat / Sunda</td>
+                  <td className="py-1.5 px-2 font-semibold">Ru / Tumbak / Bata (14 m²)</td>
+                  <td className="py-1.5 px-2 text-right font-bold font-mono">{(totalArea / 14).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} tumbak</td>
+                  <td className="py-1.5 px-2 text-slate-500 text-[10px]">Jawa Barat / Sunda (disesuaikan)</td>
                 </tr>
                 <tr className="border-b border-slate-200">
                   <td className="py-1.5 px-2 font-semibold">Ubin</td>
@@ -601,6 +602,8 @@ export default function App() {
               manualTriangleConfigs={manualTriangleConfigs}
               setManualTriangleConfigs={setManualTriangleConfigs}
               shoelaceArea={shoelaceArea}
+              lockedSides={lockedSides}
+              setLockedSides={setLockedSides}
             />
           </div>
 

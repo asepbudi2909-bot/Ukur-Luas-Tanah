@@ -18,7 +18,7 @@ export const LocalUnitsConverter: React.FC<LocalUnitsConverterProps> = ({
   const inHectares = roundedArea / 10000;
   const inAre = roundedArea / 100;
   const inRantai = roundedArea / 400; // Sumatra
-  const inTumbakBata = roundedArea / 14.0625; // West Java (Sunda)
+  const inTumbakBata = roundedArea / 14; // West Java (Sunda) - Adjusted to exactly 14 m² per user request
   const inUbin = roundedArea / 14.0625; // Central/East Java
   const inBahu = roundedArea / 7096.5; // Traditional Java
 
@@ -46,10 +46,10 @@ export const LocalUnitsConverter: React.FC<LocalUnitsConverterProps> = ({
     {
       unit: 'Bata / Ru / Tumbak',
       value: inTumbakBata,
-      suffix: 'bata',
-      description: 'Satuan tradisional utama masyarakat Sunda.',
-      ratio: '1 tumbak ≈ 14.06 m²',
-      region: 'Jawa Barat & Banten',
+      suffix: 'tumbak',
+      description: 'Satuan tradisional utama di Jawa Barat (disesuaikan 14 m² pas).',
+      ratio: '1 tumbak = 14 m²',
+      region: 'Jawa Barat / Sunda',
       color: 'border-amber-500/10 bg-[#1c2128]/70 text-amber-400'
     },
     {
@@ -168,7 +168,7 @@ export const LocalUnitsConverter: React.FC<LocalUnitsConverterProps> = ({
           <div className="text-right">
             <div className="text-lg font-black font-mono text-emerald-400 tracking-tight">
               {isClosed ? (
-                `Rp ${totalValuation.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                `Rp ${totalValuation.toLocaleString('id-ID', { maximumFractionDigits: 0 })}`
               ) : (
                 <span className="text-slate-600 font-semibold">-</span>
               )}

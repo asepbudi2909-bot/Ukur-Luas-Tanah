@@ -17,7 +17,9 @@ import {
   PlusCircle,
   ZoomIn,
   ZoomOut,
-  Hand
+  Hand,
+  Lock,
+  Unlock
 } from 'lucide-react';
 
 interface LandCanvasProps {
@@ -40,6 +42,8 @@ interface LandCanvasProps {
   manualTriangleConfigs: ManualTriangleConfig[];
   setManualTriangleConfigs: React.Dispatch<React.SetStateAction<ManualTriangleConfig[]>>;
   shoelaceArea: number;
+  lockedSides: Record<string, number>;
+  setLockedSides: React.Dispatch<React.SetStateAction<Record<string, number>>>;
 }
 
 export const LandCanvas: React.FC<LandCanvasProps> = ({
@@ -62,11 +66,15 @@ export const LandCanvas: React.FC<LandCanvasProps> = ({
   manualTriangleConfigs,
   setManualTriangleConfigs,
   shoelaceArea,
+  lockedSides,
+  setLockedSides,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [activeTab, setActiveTab] = useState<'coords' | 'sides'>('coords');
   const [draggingPointId, setDraggingPointId] = useState<string | null>(null);
   const [hoveredPointId, setHoveredPointId] = useState<string | null>(null);
-  const [canvasSize, setCanvasSize] = useState({ width: 700, height: 450 });
+  const [canvasHeight, setCanvasHeight] = useState<number>(550); // Default to a spacious 550px height
+  const [canvasSize, setCanvasSize] = useState({ width: 700, height: 550 });
   const [hoveredFirstPoint, setHoveredFirstPoint] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
@@ -77,13 +85,13 @@ export const LandCanvas: React.FC<LandCanvasProps> = ({
   const [panStart, setPanStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [hasDraggedViewport, setHasDraggedViewport] = useState<boolean>(false);
 
-  // Update canvas size on mount & resize
+  // Update canvas size on mount, resize, or height changes
   useEffect(() => {
     const handleResize = () => {
       if (containerRef.current) {
         setCanvasSize({
           width: containerRef.current.clientWidth,
-          height: 450,
+          height: canvasHeight,
         });
       }
     };
@@ -91,7 +99,7 @@ export const LandCanvas: React.FC<LandCanvasProps> = ({
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [canvasHeight]);
 
   // Set proper initial points if empty to make users welcome
   useEffect(() => {
@@ -201,14 +209,162 @@ export const LandCanvas: React.FC<LandCanvasProps> = ({
       // Apply Snapping
       const { x, y } = applySnapping(rawX, rawY);
 
-      setPoints((prev) =>
-        prev.map((pt) => (pt.id === draggingPointId ? { ...pt, x, y } : pt))
-      );
+      setPoints((prev) => {
+        const updated = prev.map((pt) => (pt.id === draggingPointId ? { ...pt, x, y } : pt));
+        const anchorIdx = updated.findIndex((pt) => pt.id === draggingPointId);
+        return adjustPointsForLocks(updated, lockedSides, scalePixelRatio, anchorIdx);
+      });
     }
   };
 
   const handleSvgMouseUp = () => {
     setIsPanning(false);
+  };
+
+  const adjustPointsForLocks = (
+    pts: Point[],
+    locks: Record<string, number>,
+    scale: number,
+    anchorIdx: number
+  ): Point[] => {
+    if (pts.length < 2) return pts;
+    const n = pts.length;
+    const adjusted = [...pts];
+
+    // Forward propagation of constraints
+    for (let i = 0; i < n; i++) {
+      const idx = (anchorIdx + i) % n;
+      const nextIdx = (idx + 1) % n;
+      
+      if (nextIdx === anchorIdx) continue;
+
+      const ptStart = adjusted[idx];
+      const ptNext = adjusted[nextIdx];
+      const lockedLen = locks[ptStart.id];
+
+      if (lockedLen !== undefined && lockedLen !== null) {
+        const targetPixelDist = lockedLen * scale;
+        const dx = ptNext.x - ptStart.x;
+        const dy = ptNext.y - ptStart.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist > 1e-3) {
+          adjusted[nextIdx] = {
+            ...ptNext,
+            x: ptStart.x + (dx / dist) * targetPixelDist,
+            y: ptStart.y + (dy / dist) * targetPixelDist,
+          };
+        } else {
+          adjusted[nextIdx] = {
+            ...ptNext,
+            x: ptStart.x + targetPixelDist,
+            y: ptStart.y,
+          };
+        }
+      }
+    }
+
+    // Backward propagation of constraints
+    for (let i = 0; i < n; i++) {
+      const idx = (anchorIdx - i + n) % n;
+      const prevIdx = (idx - 1 + n) % n;
+
+      if (prevIdx === anchorIdx) continue;
+
+      const ptStart = adjusted[prevIdx];
+      const ptEnd = adjusted[idx];
+      const lockedLen = locks[ptStart.id];
+
+      if (lockedLen !== undefined && lockedLen !== null) {
+        const targetPixelDist = lockedLen * scale;
+        const dx = ptStart.x - ptEnd.x;
+        const dy = ptStart.y - ptEnd.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist > 1e-3) {
+          adjusted[prevIdx] = {
+            ...ptStart,
+            x: ptEnd.x + (dx / dist) * targetPixelDist,
+            y: ptEnd.y + (dy / dist) * targetPixelDist,
+          };
+        } else {
+          adjusted[prevIdx] = {
+            ...ptStart,
+            x: ptEnd.x - targetPixelDist,
+            y: ptEnd.y,
+          };
+        }
+      }
+    }
+
+    return adjusted;
+  };
+
+  const handleSideLengthChange = (startIndex: number, newLengthM: number) => {
+    if (points.length < 2) return;
+    const n = points.length;
+    const p1Idx = startIndex;
+    const p2Idx = (startIndex + 1) % n;
+
+    const p1 = points[p1Idx];
+    const p2 = points[p2Idx];
+
+    const currentPixelDist = getDistance(p1, p2);
+    const targetPixelDist = newLengthM * scalePixelRatio;
+
+    if (currentPixelDist < 0.1) {
+      const updatedPoints = points.map((pt, idx) => {
+        if (idx === p1Idx) return pt;
+        if (idx === p2Idx) {
+          return { ...pt, x: p1.x + targetPixelDist, y: p1.y };
+        }
+        return pt;
+      });
+      setPoints(updatedPoints);
+      return;
+    }
+
+    const dx = (p2.x - p1.x) / currentPixelDist;
+    const dy = (p2.y - p1.y) / currentPixelDist;
+
+    const newP2X = p1.x + dx * targetPixelDist;
+    const newP2Y = p1.y + dy * targetPixelDist;
+
+    const shiftX = newP2X - p2.x;
+    const shiftY = newP2Y - p2.y;
+
+    const updatedPoints = points.map((pt, idx) => {
+      let isSubsequent = false;
+      if (p1Idx < n - 1) {
+        isSubsequent = idx > p1Idx;
+      } else {
+        isSubsequent = idx === p1Idx;
+      }
+
+      if (isSubsequent) {
+        if (p1Idx < n - 1) {
+          return { ...pt, x: pt.x + shiftX, y: pt.y + shiftY };
+        } else {
+          const dxOpp = (p1.x - p2.x) / currentPixelDist;
+          const dyOpp = (p1.y - p2.y) / currentPixelDist;
+          const targetP1X = p2.x + dxOpp * targetPixelDist;
+          const targetP1Y = p2.y + dyOpp * targetPixelDist;
+          if (idx === p1Idx) {
+            return { ...pt, x: targetP1X, y: targetP1Y };
+          }
+        }
+      }
+      return pt;
+    });
+
+    const nextLocks = {
+      ...lockedSides,
+      [p1.id]: newLengthM
+    };
+
+    const finalPoints = adjustPointsForLocks(updatedPoints, nextLocks, scalePixelRatio, p2Idx);
+    setPoints(finalPoints);
+    setLockedSides(nextLocks);
   };
 
   // Mouse move handler for closing polygon hover helper
@@ -490,6 +646,9 @@ export const LandCanvas: React.FC<LandCanvasProps> = ({
         angleDeg += 180;
       }
 
+      const isLocked = lockedSides[p1.id] !== undefined;
+      const strokeColor = isLocked ? '#f59e0b' : (isClosed ? '#10b981' : '#3b82f6');
+
       elements.push(
         <g key={`edge-${p1.id}-${p2.id}`}>
           {/* Main edge path */}
@@ -498,30 +657,30 @@ export const LandCanvas: React.FC<LandCanvasProps> = ({
             y1={p1.y}
             x2={p2.x}
             y2={p2.y}
-            stroke={isClosed ? '#10b981' : '#3b82f6'}
-            strokeWidth={isClosed ? '3' : '2.5'}
+            stroke={strokeColor}
+            strokeWidth={isLocked ? '3.5' : (isClosed ? '3' : '2.5')}
             className="transition-colors duration-300"
           />
           {/* Distance Tag Bubble */}
           <g transform={`translate(${mx}, ${my}) rotate(${angleDeg})`}>
             <rect
-              x="-30"
+              x={isLocked ? "-38" : "-30"}
               y="-10"
-              width="60"
+              width={isLocked ? "76" : "60"}
               height="20"
               rx="10"
-              fill="rgba(15, 23, 42, 0.85)"
-              stroke={isClosed ? '#10b981' : '#3b82f6'}
-              strokeWidth="1.2"
+              fill={isLocked ? "rgba(245, 158, 11, 0.15)" : "rgba(15, 23, 42, 0.85)"}
+              stroke={strokeColor}
+              strokeWidth="1.5"
               className="backdrop-blur-sm"
             />
             <text
               y="4"
               textAnchor="middle"
-              fill="#ffffff"
-              className="text-[9px] font-semibold font-mono"
+              fill={isLocked ? '#f59e0b' : '#ffffff'}
+              className="text-[9.5px] font-bold font-mono"
             >
-              {realDist.toFixed(2)}m
+              {isLocked ? `🔒 ${realDist.toFixed(2)}m` : `${realDist.toFixed(2)}m`}
             </text>
           </g>
         </g>
@@ -647,6 +806,43 @@ export const LandCanvas: React.FC<LandCanvasProps> = ({
             </button>
           </div>
 
+          <div className="h-5 w-[1px] bg-slate-800 mx-1 hidden md:block"></div>
+
+          {/* Canvas Height presets selector */}
+          <div className="flex bg-slate-900/80 border border-slate-800 rounded-lg p-1 text-[11px] items-center gap-0.5">
+            <span className="text-[10px] font-mono text-slate-500 font-bold px-1.5 uppercase tracking-wider hidden lg:inline">Area Canvas:</span>
+            <button
+              onClick={() => setCanvasHeight(450)}
+              className={`px-2.5 py-1 rounded-md transition-all cursor-pointer font-semibold ${
+                canvasHeight === 450
+                  ? 'bg-slate-800 text-blue-400 text-xs shadow-sm shadow-black/25'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Sedang
+            </button>
+            <button
+              onClick={() => setCanvasHeight(550)}
+              className={`px-2.5 py-1 rounded-md transition-all cursor-pointer font-semibold ${
+                canvasHeight === 550
+                  ? 'bg-slate-800 text-blue-400 text-xs shadow-sm shadow-black/25'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Luas
+            </button>
+            <button
+              onClick={() => setCanvasHeight(700)}
+              className={`px-2.5 py-1 rounded-md transition-all cursor-pointer font-semibold ${
+                canvasHeight === 700
+                  ? 'bg-slate-800 text-blue-400 text-xs shadow-sm shadow-black/25'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Sangat Luas
+            </button>
+          </div>
+
           {/* Quick Manual Close Option */}
           {points.length >= 3 && !isClosed && (
             <button
@@ -669,7 +865,7 @@ export const LandCanvas: React.FC<LandCanvasProps> = ({
             ? (isPanning ? 'cursor-grabbing' : 'cursor-grab') 
             : 'cursor-crosshair'
         }`}
-        style={{ height: '450px' }}
+        style={{ height: `${canvasHeight}px` }}
         onMouseUp={handleDragEnd}
         onMouseLeave={handleDragEnd}
       >
@@ -705,7 +901,7 @@ export const LandCanvas: React.FC<LandCanvasProps> = ({
             onClick={() => {
               const rect = containerRef.current?.getBoundingClientRect();
               const centerX = rect ? rect.width / 2 : 350;
-              const centerY = rect ? rect.height / 2 : 225;
+              const centerY = rect ? rect.height / 2 : canvasHeight / 2;
               const nextZoom = Math.min(zoom * 1.3, 8);
               setPan((prev) => ({
                 x: centerX - (centerX - prev.x) * (nextZoom / zoom),
@@ -722,7 +918,7 @@ export const LandCanvas: React.FC<LandCanvasProps> = ({
             onClick={() => {
               const rect = containerRef.current?.getBoundingClientRect();
               const centerX = rect ? rect.width / 2 : 350;
-              const centerY = rect ? rect.height / 2 : 225;
+              const centerY = rect ? rect.height / 2 : canvasHeight / 2;
               const nextZoom = Math.max(zoom / 1.3, 0.4);
               setPan((prev) => ({
                 x: centerX - (centerX - prev.x) * (nextZoom / zoom),
@@ -1002,86 +1198,239 @@ export const LandCanvas: React.FC<LandCanvasProps> = ({
         </div>
       </div>
 
-      {/* Table grid for Precision Manual Coordinates Correction */}
+      {/* Table grid for Precision Manual Coordinates & Side Length Correction */}
       {points.length > 0 && (
         <div className="bg-slate-950 p-5 border-t border-slate-850/80" id="manual-coords-correction">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-sm bg-blue-500 shadow-sm animate-pulse"></span>
-              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider font-mono">
-                Daftar & Koreksi Koordinat Patok Presisi (Meter)
-              </h4>
-            </div>
-            <p className="text-[10px] text-slate-500 font-mono">
-              Origin (0,0) = Pojok Kiri Atas Canvas • Skala: 1m = {scalePixelRatio.toFixed(2)}px
-            </p>
+          
+          {/* Elegant tab header */}
+          <div className="flex border-b border-slate-800 mb-4 overflow-x-auto">
+            <button
+              onClick={() => setActiveTab('coords')}
+              className={`pb-2 px-4 text-xs font-bold font-mono tracking-wider transition-all duration-200 border-b-2 uppercase whitespace-nowrap ${
+                activeTab === 'coords'
+                  ? 'border-blue-500 text-blue-400'
+                  : 'border-transparent text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              📍 Koreksi Koordinat Patok (X, Y)
+            </button>
+            <button
+              onClick={() => setActiveTab('sides')}
+              className={`pb-2 px-4 text-xs font-bold font-mono tracking-wider transition-all duration-200 border-b-2 uppercase whitespace-nowrap ${
+                activeTab === 'sides'
+                  ? 'border-amber-500 text-amber-500'
+                  : 'border-transparent text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              📏 Panjang & Penguncian Sisi (Batas)
+            </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2.5 max-h-[160px] overflow-y-auto pr-1 custom-scrollbar">
-            {points.map((pt, idx) => {
-              const xVal = parseFloat((pt.x / scalePixelRatio).toFixed(2));
-              const yVal = parseFloat((pt.y / scalePixelRatio).toFixed(2));
+          {activeTab === 'coords' && (
+            <div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-sm bg-blue-500 shadow-sm animate-pulse"></span>
+                  <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider font-mono">
+                    Daftar & Koreksi Koordinat Patok Presisi (Meter)
+                  </h4>
+                </div>
+                <p className="text-[10px] text-slate-500 font-mono">
+                  Origin (0,0) = Pojok Kiri Atas Canvas • Skala: 1m = {scalePixelRatio.toFixed(2)}px
+                </p>
+              </div>
 
-              return (
-                <div 
-                  key={pt.id} 
-                  className="bg-slate-900/60 border border-slate-800 hover:border-slate-700/80 rounded-xl p-2.5 flex items-center justify-between gap-3 transition-colors"
-                >
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-6 h-6 rounded bg-slate-800 border border-slate-700 text-slate-300 font-mono text-[10px] font-black flex items-center justify-center">
-                      {pt.label}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[160px] overflow-y-auto pr-1 custom-scrollbar">
+                {points.map((pt, idx) => {
+                  const xVal = parseFloat((pt.x / scalePixelRatio).toFixed(2));
+                  const yVal = parseFloat((pt.y / scalePixelRatio).toFixed(2));
+
+                  return (
+                    <div 
+                      key={pt.id} 
+                      className="bg-slate-900/60 border border-slate-800 hover:border-slate-700/80 rounded-xl p-3 flex items-center justify-between gap-3 transition-colors"
+                    >
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <span className="w-6 h-6 rounded bg-slate-800 border border-slate-700 text-slate-300 font-mono text-[10px] font-black flex items-center justify-center">
+                          {pt.label}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+                        <div className="flex items-center justify-between gap-1 bg-slate-950 border border-slate-850 rounded px-2.5 py-1.5 w-[90px] flex-shrink-0 focus-within:border-blue-500/50 transition-colors">
+                          <span className="text-[9px] font-mono text-slate-550 font-bold">X:</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={xVal}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value);
+                              if (!isNaN(val)) {
+                                const newX = val * scalePixelRatio;
+                                const updated = points.map(p => p.id === pt.id ? { ...p, x: newX } : p);
+                                const anchorIdx = updated.findIndex(p => p.id === pt.id);
+                                const finalPts = adjustPointsForLocks(updated, lockedSides, scalePixelRatio, anchorIdx);
+                                setPoints(finalPts);
+                              }
+                            }}
+                            className="w-full bg-transparent border-none text-xs font-mono font-bold text-emerald-400 focus:outline-none focus:ring-0 p-0 text-right min-w-[30px]"
+                          />
+                          <span className="text-[9px] font-mono text-slate-550">m</span>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-1 bg-slate-950 border border-slate-850 rounded px-2.5 py-1.5 w-[90px] flex-shrink-0 focus-within:border-blue-500/50 transition-colors">
+                          <span className="text-[9px] font-mono text-slate-550 font-bold">Y:</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={yVal}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value);
+                              if (!isNaN(val)) {
+                                const newY = val * scalePixelRatio;
+                                const updated = points.map(p => p.id === pt.id ? { ...p, y: newY } : p);
+                                const anchorIdx = updated.findIndex(p => p.id === pt.id);
+                                const finalPts = adjustPointsForLocks(updated, lockedSides, scalePixelRatio, anchorIdx);
+                                setPoints(finalPts);
+                              }
+                            }}
+                            className="w-full bg-transparent border-none text-xs font-mono font-bold text-emerald-400 focus:outline-none focus:ring-0 p-0 text-right min-w-[30px]"
+                          />
+                          <span className="text-[9px] font-mono text-slate-550">m</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-2.5 text-[10px] text-slate-450 leading-relaxed bg-[#0b0d10] border border-slate-800 p-2.5 rounded-lg flex items-start gap-1.5 font-sans">
+                <span className="text-amber-400 font-bold font-mono">TIPS:</span>
+                <span>
+                  Anda bebas meletakkan patok di mana saja di canvas tanpa dipaksa mengunci ke petak grid. Tuliskan nilai meter presisi di tabel atas (misal X: 12.50) untuk menyesuaikan ketepatan rill sesuai data riwayat pengukuran lapangan atau surat BPN Anda.
+                </span>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'sides' && (
+            <div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-sm bg-amber-500 shadow-sm animate-pulse"></span>
+                  <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider font-mono">
+                    Daftar Sisi Batas Lahan & Koreksi Panjang Sisi
+                  </h4>
+                </div>
+                <p className="text-[10px] text-slate-500 font-mono">
+                  Gunakan untuk mengetes panjang sisi rill Anda (Heron & CAD menyesuaikan).
+                </p>
+              </div>
+
+              {points.length < 2 ? (
+                <div className="text-center py-6 text-xs text-slate-500 font-medium font-sans">
+                  Tambahkan minimal 2 patok terlebih dahulu untuk mulai melihat sisi batas lahan.
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[160px] overflow-y-auto pr-1 custom-scrollbar">
+                    {(() => {
+                      const limit = isClosed ? points.length : points.length - 1;
+                      const sideItems = [];
+                      for (let i = 0; i < limit; i++) {
+                        const pCurrent = points[i];
+                        const pNext = points[(i + 1) % points.length];
+                        const pxDist = getDistance(pCurrent, pNext);
+                        const realDist = pxDist / scalePixelRatio;
+                        const isSideLocked = lockedSides[pCurrent.id] !== undefined;
+
+                        sideItems.push({
+                          index: i,
+                          pCurrent,
+                          pNext,
+                          realDist,
+                          isSideLocked
+                        });
+                      }
+
+                      return sideItems.map((item) => {
+                        const { index, pCurrent, pNext, realDist, isSideLocked } = item;
+                        return (
+                          <div 
+                            key={`side-editor-${pCurrent.id}`}
+                            className={`border rounded-xl p-3 flex items-center justify-between gap-3 transition-all duration-150 ${
+                              isSideLocked 
+                                ? 'bg-amber-950/20 border-amber-500/40 hover:border-amber-500/60 shadow-inner' 
+                                : 'bg-slate-900/60 border-slate-800 hover:border-slate-700/80 shadow-sm'
+                            }`}
+                          >
+                            <div className="flex flex-col gap-0.5 min-w-0 flex-shrink-0">
+                              <span className="text-[10px] font-black font-mono text-slate-300 uppercase truncate">
+                                Sisi {pCurrent.label} → {pNext.label}
+                              </span>
+                              <span className="text-[9px] text-slate-550 font-mono">
+                                {isSideLocked ? '🔒 Dikunci' : '🔓 Bebas'}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2 flex-shrink-0 ml-auto select-none">
+                              <div className="flex items-center justify-between gap-1.5 bg-slate-950 border border-slate-850 rounded-lg px-2.5 py-1.5 w-[100px] flex-shrink-0 focus-within:border-amber-500/50 transition-colors">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0.1"
+                                  value={parseFloat(realDist.toFixed(2))}
+                                  onChange={(e) => {
+                                    const val = parseFloat(e.target.value);
+                                    if (!isNaN(val) && val > 0) {
+                                      handleSideLengthChange(index, val);
+                                    }
+                                  }}
+                                  className="w-full bg-transparent border-none text-xs font-mono font-bold text-amber-500 focus:outline-none focus:ring-0 p-0 text-right min-w-[45px]"
+                                />
+                                <span className="text-[9px] font-mono text-slate-550 font-medium">m</span>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (isSideLocked) {
+                                    const nextLocks = { ...lockedSides };
+                                    delete nextLocks[pCurrent.id];
+                                    setLockedSides(nextLocks);
+                                  } else {
+                                    setLockedSides({
+                                      ...lockedSides,
+                                      [pCurrent.id]: parseFloat(realDist.toFixed(2))
+                                    });
+                                  }
+                                }}
+                                className={`p-2 rounded-lg border transition-all flex-shrink-0 ${
+                                  isSideLocked
+                                    ? 'bg-amber-500 text-slate-950 border-amber-400 hover:bg-amber-400'
+                                    : 'bg-slate-950 text-slate-400 border-slate-850 hover:bg-slate-900 hover:text-slate-200'
+                                }`}
+                                title={isSideLocked ? "Buka Kunci Panjang Sisi" : "Kunci Panjang Sisi"}
+                              >
+                                {isSideLocked ? <Lock size={12} strokeWidth={2.5} /> : <Unlock size={12} />}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+
+                  <div className="mt-2.5 text-[10px] text-slate-450 leading-relaxed bg-[#0b0d10] border border-slate-800 p-2.5 rounded-lg flex items-start gap-1.5 font-sans">
+                    <span className="text-amber-400 font-bold font-mono">PETUNJUK KUNCI SISI:</span>
+                    <span>
+                      Masukkan panjang rill dalam satuan Meter jika Anda mengetahui data pastinya sesuai sertifikat BPN atau hasil rill ukur meteran gulung. Ketika suatu sisi **dikunci (🔒)**, menyeret patok lain di canvas atau mengubah posisi patok sekunder akan otomatis menjaga panjang sisi tersebut agar tetap presisi sesuai angka kuncian Anda secara konstan!
                     </span>
                   </div>
+                </>
+              )}
+            </div>
+          )}
 
-                  <div className="flex items-center gap-2 flex-1">
-                    <div className="flex items-center justify-between gap-1 bg-slate-950 border border-slate-850 rounded px-2 py-1 flex-1">
-                      <span className="text-[9px] font-mono text-slate-550 font-bold">X:</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={xVal}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value);
-                          if (!isNaN(val)) {
-                            const newX = val * scalePixelRatio;
-                            const updated = points.map(p => p.id === pt.id ? { ...p, x: newX } : p);
-                            setPoints(updated);
-                          }
-                        }}
-                        className="w-full bg-transparent border-none text-xs font-mono font-bold text-emerald-400 focus:outline-none focus:ring-0 p-0 text-right min-w-[30px]"
-                      />
-                      <span className="text-[9px] font-mono text-slate-550">m</span>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-1 bg-slate-950 border border-slate-850 rounded px-2 py-1 flex-1">
-                      <span className="text-[9px] font-mono text-slate-550 font-bold">Y:</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={yVal}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value);
-                          if (!isNaN(val)) {
-                            const newY = val * scalePixelRatio;
-                            const updated = points.map(p => p.id === pt.id ? { ...p, y: newY } : p);
-                            setPoints(updated);
-                          }
-                        }}
-                        className="w-full bg-transparent border-none text-xs font-mono font-bold text-emerald-400 focus:outline-none focus:ring-0 p-0 text-right min-w-[30px]"
-                      />
-                      <span className="text-[9px] font-mono text-slate-550">m</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <div className="mt-2.5 text-[10px] text-slate-450 leading-relaxed bg-[#0b0d10] border border-slate-800 p-2.5 rounded-lg flex items-start gap-1.5">
-            <span className="text-amber-400 font-bold font-mono">TIPS:</span>
-            <span>
-              Anda bebas meletakkan patok di mana saja di canvas tanpa dipaksa mengunci ke petak grid. Tuliskan nilai meter presisi di tabel atas (misal X: 12.50) untuk menyesuaikan ketepatan rill sesuai data riwayat pengukuran lapangan atau surat BPN Anda.
-            </span>
-          </div>
         </div>
       )}
     </div>
