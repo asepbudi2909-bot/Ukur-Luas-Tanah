@@ -1,0 +1,7 @@
+name = "kalkulator-ukur-tanah"
+compatibility_date = "2025-12-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "kalkulator_db"
+database_id = "0b1695f1-55b8-45b7-8879-75ea1b9e9ec5"
