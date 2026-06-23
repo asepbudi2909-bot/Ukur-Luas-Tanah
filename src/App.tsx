@@ -28,6 +28,7 @@ export default function App() {
   const gridSize = 40; // grid size in pixels
 
   const [activeTriangleId, setActiveTriangleId] = useState<string | null>(null);
+  const [activeLandId, setActiveLandId] = useState<string | null>(null);
   const [activeLandName, setActiveLandName] = useState<string>('');
   const [activeLandNotes, setActiveLandNotes] = useState<string>('');
 
@@ -41,6 +42,11 @@ export default function App() {
     if (points.length < 3) {
       setManualTriangleConfigs([]);
       setSelectedPointIds([]);
+    }
+    if (points.length === 0) {
+      setActiveLandId(null);
+      setActiveLandName('');
+      setActiveLandNotes('');
     }
   }, [points]);
 
@@ -140,6 +146,7 @@ export default function App() {
     setSelectedPointIds([]);
     setIsClosed(true); // Saved configuration is always a closed polygon
     setDrawingMode('heron');
+    setActiveLandId(land.id);
     setActiveLandName(land.name);
     setActiveLandNotes(land.notes || '');
   };
@@ -563,7 +570,7 @@ export default function App() {
       </header>
 
       {/* Main Workspace Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6 print:hidden" id="main-content">
+      <main className="flex-1 max-w-8xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6 print:hidden" id="main-content">
         
         {/* Dynamic Warning for users in case of self-intersection */}
         {points.length > 0 && !isClosed && (
@@ -580,8 +587,8 @@ export default function App() {
         {/* CAD Blueprint Layout section */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
           
-          {/* Main Visual Canvas Blueprint (Col: 7/12) */}
-          <div className="lg:col-span-7 flex flex-col" id="col-canvas">
+          {/* Main Visual Canvas Blueprint (Col: 8/12) */}
+          <div className="lg:col-span-8 flex flex-col" id="col-canvas">
             <LandCanvas
               points={points}
               setPoints={setPoints}
@@ -607,8 +614,8 @@ export default function App() {
             />
           </div>
 
-          {/* Mathematical Computations (Col: 5/12) */}
-          <div className="lg:col-span-5 flex flex-col" id="col-math">
+          {/* Mathematical Computations (Col: 4/12) */}
+          <div className="lg:col-span-4 flex flex-col" id="col-math">
             <CalculationDetails
               triangles={triangles}
               isClosed={isClosed}
@@ -644,6 +651,8 @@ export default function App() {
             setNewName={setActiveLandName}
             newNotes={activeLandNotes}
             setNewNotes={setActiveLandNotes}
+            activeLandId={activeLandId}
+            setActiveLandId={setActiveLandId}
           />
         </div>
 
