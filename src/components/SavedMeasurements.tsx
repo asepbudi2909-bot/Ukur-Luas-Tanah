@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { SavedLand, Point, ManualTriangleConfig } from '../types';
+import { api } from '../utils/api';
 import { 
   Bookmark, 
   FolderOpen, 
@@ -11,7 +12,8 @@ import {
   Edit2, 
   X, 
   Check, 
-  RefreshCw 
+  RefreshCw,
+  Loader2
 } from 'lucide-react';
 
 interface SavedMeasurementsProps {
@@ -42,6 +44,7 @@ export const SavedMeasurements: React.FC<SavedMeasurementsProps> = ({
   setActiveLandId,
 }) => {
   const [savedLands, setSavedLands] = useState<SavedLand[]>([]);
+  const [loading, setLoading] = useState(false);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   
@@ -50,30 +53,41 @@ export const SavedMeasurements: React.FC<SavedMeasurementsProps> = ({
   const [editingName, setEditingName] = useState<string>('');
   const [editingNotes, setEditingNotes] = useState<string>('');
 
-  // Load from local storage
-  useEffect(() => {
-    const data = localStorage.getItem('heron-saved-lands');
-    if (data) {
-      try {
-        setSavedLands(JSON.parse(data));
-      } catch (err) {
-        console.error('Failed to parse saved lands', err);
+  // Load from D1
+  const fetchLands = async () => {
+    setLoading(true);
+    try {
+      const res = await api.request('/api/lands');
+      if (res.ok) {
+        const data: any = await res.json();
+        // Convert camelCase from DB if necessary, but here we'll map correctly
+        const mappedData: SavedLand[] = data.map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          date: item.date,
+          points: item.points,
+          scalePixelRatio: item.scale_pixel_ratio,
+          notes: item.notes,
+          manualTriangleConfigs: item.manual_triangle_configs
+        }));
+        setSavedLands(mappedData);
       }
+    } catch (err) {
+      console.error('Failed to fetch lands', err);
+    } finally {
+      setLoading(false);
     }
-  }, []);
-
-  // Save to local storage
-  const saveToLocalStorage = (lands: SavedLand[]) => {
-    localStorage.setItem('heron-saved-lands', JSON.stringify(lands));
-    setSavedLands(lands);
   };
 
-  const handleSaveLand = () => {
+  useEffect(() => {
+    fetchLands();
+  }, []);
+
+  const handleSaveLand = async () => {
     if (points.length < 3 || !isClosed) return;
     if (!newName.trim()) return;
 
-    const newLand: SavedLand = {
-      id: `land-${Date.now()}`,
+    const landData = {
       name: newName,
       date: new Date().toLocaleDateString('id-ID', {
         year: 'numeric',
@@ -82,50 +96,66 @@ export const SavedMeasurements: React.FC<SavedMeasurementsProps> = ({
         hour: '2-digit',
         minute: '2-digit',
       }),
-      points: [...points],
-      scalePixelRatio,
+      points,
+      scale_pixel_ratio: scalePixelRatio,
       notes: newNotes.trim() ? newNotes : undefined,
-      manualTriangleConfigs: [...manualTriangleConfigs],
+      manual_triangle_configs: manualTriangleConfigs,
     };
 
-    const updated = [newLand, ...savedLands];
-    saveToLocalStorage(updated);
-    setActiveLandId(newLand.id); // set as active edited land
+    try {
+      const res = await api.request('/api/lands', {
+        method: 'POST',
+        body: JSON.stringify(landData),
+      });
 
-    setSuccessMessage('Data pemetaan berhasil diarsipkan secara lokal!');
-    setShowSaveSuccess(true);
-    setTimeout(() => setShowSaveSuccess(false), 3000);
+      if (res.ok) {
+        const result: any = await res.json();
+        setActiveLandId(result.id);
+        fetchLands();
+        setSuccessMessage('Data pemetaan berhasil diarsipkan di cloud!');
+        setShowSaveSuccess(true);
+        setTimeout(() => setShowSaveSuccess(false), 3000);
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const handleUpdateLand = () => {
+  const handleUpdateLand = async () => {
     if (!activeLandId) return;
     if (!newName.trim()) return;
 
-    const updated = savedLands.map((land) => {
-      if (land.id === activeLandId) {
-        return {
-          ...land,
-          name: newName.trim(),
-          notes: newNotes.trim() ? newNotes.trim() : undefined,
-          points: [...points],
-          scalePixelRatio,
-          manualTriangleConfigs: [...manualTriangleConfigs],
-          date: `${new Date().toLocaleDateString('id-ID', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-          })} (diperbarui)`,
-        };
-      }
-      return land;
-    });
+    const landData = {
+      id: activeLandId,
+      name: newName.trim(),
+      notes: newNotes.trim() ? newNotes.trim() : undefined,
+      points,
+      scale_pixel_ratio: scalePixelRatio,
+      manual_triangle_configs: manualTriangleConfigs,
+      date: `${new Date().toLocaleDateString('id-ID', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })} (diperbarui)`,
+    };
 
-    saveToLocalStorage(updated);
-    setSuccessMessage('Arsip pemetaan berhasil diperbarui!');
-    setShowSaveSuccess(true);
-    setTimeout(() => setShowSaveSuccess(false), 3000);
+    try {
+      const res = await api.request('/api/lands', {
+        method: 'POST',
+        body: JSON.stringify(landData),
+      });
+
+      if (res.ok) {
+        fetchLands();
+        setSuccessMessage('Arsip pemetaan berhasil diperbarui!');
+        setShowSaveSuccess(true);
+        setTimeout(() => setShowSaveSuccess(false), 3000);
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const handleUnlinkLand = () => {
@@ -134,15 +164,21 @@ export const SavedMeasurements: React.FC<SavedMeasurementsProps> = ({
     setNewNotes('');
   };
 
-  const handleDeleteLand = (e: React.MouseEvent, id: string) => {
+  const handleDeleteLand = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     if (window.confirm('Apakah Anda yakin ingin menghapus arsip data ukur lahan ini?')) {
-      const updated = savedLands.filter((l) => l.id !== id);
-      saveToLocalStorage(updated);
-      if (activeLandId === id) {
-        setActiveLandId(null);
-        setNewName('');
-        setNewNotes('');
+      try {
+        const res = await api.request(`/api/lands?id=${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          fetchLands();
+          if (activeLandId === id) {
+            setActiveLandId(null);
+            setNewName('');
+            setNewNotes('');
+          }
+        }
+      } catch (err) {
+        console.error(err);
       }
     }
   };
@@ -160,28 +196,35 @@ export const SavedMeasurements: React.FC<SavedMeasurementsProps> = ({
     setEditingLandId(null);
   };
 
-  const handleSaveInlineEdit = (e: React.MouseEvent, id: string) => {
+  const handleSaveInlineEdit = async (e: React.MouseEvent, land: SavedLand) => {
     e.stopPropagation();
     if (!editingName.trim()) return;
 
-    const updated = savedLands.map((land) => {
-      if (land.id === id) {
-        return {
-          ...land,
-          name: editingName.trim(),
-          notes: editingNotes.trim() ? editingNotes.trim() : undefined,
-        };
+    const updatedData = {
+      ...land,
+      id: land.id, // ensure id is passed for update
+      name: editingName.trim(),
+      notes: editingNotes.trim() ? editingNotes.trim() : undefined,
+      scale_pixel_ratio: land.scalePixelRatio, // Map back to DB field name
+      manual_triangle_configs: land.manualTriangleConfigs
+    };
+
+    try {
+      const res = await api.request('/api/lands', {
+        method: 'POST',
+        body: JSON.stringify(updatedData),
+      });
+
+      if (res.ok) {
+        fetchLands();
+        setEditingLandId(null);
+        if (activeLandId === land.id) {
+          setNewName(editingName.trim());
+          setNewNotes(editingNotes.trim());
+        }
       }
-      return land;
-    });
-
-    saveToLocalStorage(updated);
-    setEditingLandId(null);
-
-    // Synchronize current inputs if the active land was edited inline
-    if (activeLandId === id) {
-      setNewName(editingName.trim());
-      setNewNotes(editingNotes.trim());
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -191,8 +234,8 @@ export const SavedMeasurements: React.FC<SavedMeasurementsProps> = ({
       <div className="flex items-center gap-2.5">
         <Bookmark className="text-emerald-400" size={20} />
         <div>
-          <h3 className="font-bold text-white text-sm">Arsip Pemetaan</h3>
-          <p className="text-[11px] text-slate-400">Simpan, perbarui, dan kelola arsip pengukuran lahan secara instan dalam perangkat Anda.</p>
+          <h3 className="font-bold text-white text-sm">Arsip Pemetaan Cloud</h3>
+          <p className="text-[11px] text-slate-400">Simpan, perbarui, dan kelola arsip pengukuran lahan Anda secara terpusat.</p>
         </div>
       </div>
 
@@ -313,10 +356,14 @@ export const SavedMeasurements: React.FC<SavedMeasurementsProps> = ({
             <span className="text-[10px] font-bold text-slate-400 font-mono block uppercase">ARSIP LAHAN TERSIMPAN ({savedLands.length})</span>
           </div>
 
-          {savedLands.length === 0 ? (
+          {loading ? (
+            <div className="flex-1 flex items-center justify-center">
+              <Loader2 className="animate-spin text-slate-600" size={28} />
+            </div>
+          ) : savedLands.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-slate-500">
               <FolderOpen size={28} className="text-slate-700 mb-2 font-mono" />
-              <p className="text-[11px] text-slate-500">Belum ada pemetaan yang diarsipkan secara lokal.</p>
+              <p className="text-[11px] text-slate-500">Belum ada pemetaan yang diarsipkan.</p>
             </div>
           ) : (
             <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
@@ -360,7 +407,7 @@ export const SavedMeasurements: React.FC<SavedMeasurementsProps> = ({
                         </button>
                         <button 
                           type="button"
-                          onClick={(e) => handleSaveInlineEdit(e, land.id)}
+                          onClick={(e) => handleSaveInlineEdit(e, land)}
                           disabled={!editingName.trim()}
                           className="px-3 py-1 text-[10px] font-bold bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-500 rounded text-white transition-colors cursor-pointer flex items-center gap-1"
                         >

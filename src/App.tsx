@@ -5,6 +5,9 @@ import { LandCanvas } from './components/LandCanvas';
 import { CalculationDetails } from './components/CalculationDetails';
 import { LocalUnitsConverter } from './components/LocalUnitsConverter';
 import { SavedMeasurements } from './components/SavedMeasurements';
+import { Login } from './components/Login';
+import { UserManagement } from './components/UserManagement';
+import { api } from './utils/api';
 import { motion } from 'motion/react';
 import { 
   Compass, 
@@ -16,10 +19,15 @@ import {
   HelpCircle,
   FileText,
   Scaling,
-  Info
+  Info,
+  LogOut,
+  Users
 } from 'lucide-react';
 
 export default function App() {
+  const [user, setUser] = useState<any>(api.getUser());
+  const [showUserManagement, setShowUserManagement] = useState(false);
+
   const [points, setPoints] = useState<Point[]>([]);
   const [isClosed, setIsClosed] = useState<boolean>(false);
   const [lockedSides, setLockedSides] = useState<Record<string, number>>({});
@@ -158,6 +166,16 @@ export default function App() {
   const handlePrint = () => {
     window.print();
   };
+
+  const handleLogout = () => {
+    api.clearToken();
+    api.clearUser();
+    setUser(null);
+  };
+
+  if (!user) {
+    return <Login onLoginSuccess={setUser} />;
+  }
 
   return (
     <div className="min-h-screen bg-[#0f1115] text-slate-300 flex flex-col justify-between font-sans antialiased" id="app-root">
@@ -552,19 +570,45 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-4 text-xs">
-            <div className="hidden md:flex gap-5 text-[10px] uppercase tracking-widest font-mono text-slate-500">
+            <div className="hidden lg:flex gap-5 text-[10px] uppercase tracking-widest font-mono text-slate-500 items-center">
               <span className="text-emerald-400 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Precision Active</span>
-              <span className="opacity-60">Sat-Link: Stable</span>
+              <div className="flex items-center gap-2 bg-slate-800/50 px-2 py-1 rounded border border-slate-700">
+                <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold text-[10px]">
+                  {user.username.charAt(0).toUpperCase()}
+                </div>
+                <span>{user.username}</span>
+              </div>
             </div>
-            <button
-              onClick={handlePrint}
-              disabled={points.length === 0 || !isClosed}
-              className="px-3.5 py-2 whitespace-nowrap bg-slate-800 border border-slate-700 hover:bg-slate-705 text-white hover:border-slate-600 font-medium text-xs rounded-lg transition-all flex items-center gap-1.5 disabled:opacity-45 disabled:hover:bg-slate-800 cursor-pointer"
-              id="print-action-btn"
-            >
-              <Printer size={13} className="text-emerald-400" />
-              Cetak Laporan
-            </button>
+
+            <div className="flex items-center gap-2">
+              {user.role === 'admin' && (
+                <button
+                  onClick={() => setShowUserManagement(true)}
+                  className="p-2 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-300 rounded-lg transition-all cursor-pointer"
+                  title="Kelola Pengguna"
+                >
+                  <Users size={16} />
+                </button>
+              )}
+
+              <button
+                onClick={handlePrint}
+                disabled={points.length === 0 || !isClosed}
+                className="px-3.5 py-2 whitespace-nowrap bg-slate-800 border border-slate-700 hover:bg-slate-705 text-white hover:border-slate-600 font-medium text-xs rounded-lg transition-all flex items-center gap-1.5 disabled:opacity-45 disabled:hover:bg-slate-800 cursor-pointer"
+                id="print-action-btn"
+              >
+                <Printer size={13} className="text-emerald-400" />
+                Cetak Laporan
+              </button>
+
+              <button
+                onClick={handleLogout}
+                className="p-2 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 text-rose-400 rounded-lg transition-all cursor-pointer"
+                title="Logout"
+              >
+                <LogOut size={16} />
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -655,6 +699,8 @@ export default function App() {
             setActiveLandId={setActiveLandId}
           />
         </div>
+
+        {showUserManagement && <UserManagement onClose={() => setShowUserManagement(false)} />}
 
         {/* Educational FAQ Panel on Bottom */}
         <div className="bg-[#16191f] rounded-2xl border border-slate-800 p-6 space-y-4 print:hidden" id="educational-panel">
